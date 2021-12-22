@@ -2,7 +2,7 @@
 This example is based on the [Josh Long](https://www.youtube.com/watch?v=zVNIZXf4BG8) second explanation on reactive Spring with Spring Data/MongoDB.
 
 ## Project Overview
-This project access a MongoDB database, delete all content and create new _documents_. The `Movie` class represents persistent movie data. It is implemented with Java `record`, as follows:
+This project accesses a MongoDB database, delete all content and create new _documents_. The `Movie` class represents persistent movie data. It is implemented with Java `record`, as follows:
 
 ```
 @Document // (1)
