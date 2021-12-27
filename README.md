@@ -12,3 +12,5 @@ Each folder groups a single example as follows:
 
 - [functional-reactive-endpoints](./functional-reactive-endpoints/) replaces the traditional controller annotations int the FluxFlix project with functional reactive endpoints.
 
+- [flux-flix-client](./flux-flix-client/) uses WebClient REST client to call the [flux-flix-service](./flux-flix-service/).
+
