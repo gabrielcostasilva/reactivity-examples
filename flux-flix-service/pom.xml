@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.example</groupId>
-	<artifactId>reactive-data</artifactId>
+	<artifactId>flux-flix-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>reactive-data</name>
+	<name>flux-flix-service</name>
 	<description>Demo project for Spring Boot</description>
 	<properties>
 		<java.version>17</java.version>
