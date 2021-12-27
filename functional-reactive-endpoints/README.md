@@ -2,7 +2,7 @@
 In this example, Josh Long replaces the traditional controller in the [FluxFlix Example](https://www.youtube.com/watch?v=zVNIZXf4BG8) with _functional reactive endpoints_.
 
 ## Project Overview
-This project builds on top of the FlixFlux project by replacing the traditional controller annotations with functional reactive endpoints.
+This project builds on top of the FluxFlix project by replacing the traditional controller annotations with functional reactive endpoints.
 
 For comparison's sake, we mapped before and after code. This is the **previous controller**:
 
