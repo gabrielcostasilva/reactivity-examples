@@ -17,4 +17,4 @@ Each folder groups a single example as follows:
 ## Overview of Branches
 In addition to the examples listed in the main branch, I also created additional branches that extends the code in some way.
 
-- [testing](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing) show how to test the entire stack of a reactive Web application with Spring Boot. The main reference for this branch is [Josh Long's presentation](https://www.youtube.com/watch?v=N24JZi-xFx0).
+- [testing](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing) shows how to test the entire stack of a reactive Web application with Spring Boot. The main reference for this branch is [Josh Long's presentation](https://www.youtube.com/watch?v=N24JZi-xFx0).
