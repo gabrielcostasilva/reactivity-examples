@@ -80,6 +80,15 @@
 					</excludes>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.springframework.cloud</groupId>
+				<artifactId>spring-cloud-contract-maven-plugin</artifactId>
+				<version>3.1.0</version>
+				<extensions>true</extensions>
+				<configuration>
+					<baseClassForTests>com.example.reactivedata.BaseClass</baseClassForTests>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
