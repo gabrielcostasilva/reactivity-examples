@@ -1,311 +1,206 @@
-# Reactive Programming Examples - Testing Branch
-Projects in this branch show how to test the entire stack of a reactive Web application with Spring Boot. The main reference for this branch is [Josh Long's presentation](https://www.youtube.com/watch?v=N24JZi-xFx0).
+# Reactive Programming Examples - Contract Testing Branch
+Projects in this branch extends the [testing branch](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing) to showing consumer-driven contract testing. As for the [testing branch](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing), [Josh Long's presentation](https://www.youtube.com/watch?v=N24JZi-xFx0) is the main reference for this branch.
 
-## Entity
-As implemented in this project, the `Movie` entity is just a a Java `record`. Actually, there is nothing to test in a simple `record`. Therefore, I added a validation for the movie title, as the code below shows.
 
-```java
-import org.springframework.data.mongodb.core.mapping.Document;
+## Issues When Testing Distributed Systems
+One issue when testing distributed systems is that consumer and provider interfaces must agree for a smooth integration. The test strategy used in the testing branch does not contribute for a smooth integration because we used mocks to integrating the [flux-flix-client](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing/flux-flix-client) into [flux-flix-service](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing/flux-flix-service) project.
 
- @Document
- public record Movie(String id, String title, String genre){ 
+Mocks do a good job by enabling testing whether the consumer can consume data from the provider, and the provider provides data for consumption. However, mocks do not ensure that consumer and provider adopts the same communication interface.
 
- 	public Movie {
- 		if ((title == null) || (title.length() <= 2)) {
- 			throw new IllegalArgumentException("Invalid title. Checkout whether the title is informed and longer than 2 characters.");
- 		}
- 	}
- }
-```
+In his presentation, Josh Long shows a good example of communication interface mismatch, in which the provider uses a `name` attribute whereas the consumer uses a `reservationName` attribute. Both sides pass their individual tests, but they fail when the communication must be established.
 
-The validation verifies whether the title is informed and longer than 2 characters. The validation throws an `IllegalArgumentException` if constraints are not satisfied.
+## Consumer-Driven Contract Testing
+Consumer-driven contract testing uses a contract to assert that consumer and provider agrees with the same interface. 
 
-As the `Movie` entity does not have any reactive implementation, its test does not require any special implementation other than traditional _assertions_. The code below presents the full entity test class.
+As usual, Spring has the [Spring Cloud Contract](https://spring.io/projects/spring-cloud-contract#overview) project that makes consumer-driven contract easy to implement. In addition to dependencies, the project also provides a plugin that breaks the build if the API does not comply with the established contract.
 
-```java
-package com.example.reactivedata;
 
- import static org.assertj.core.api.Assertions.assertThat;
- import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
- import static org.junit.jupiter.api.Assertions.assertNull;
+## Implementing the Contract
+First, we add dependencies to the `pom.xml` of the provider project (`flux-flix-service`), as follows:
 
- import org.junit.jupiter.api.Test;
-
- class MovieTest {
-
- 	@Test
- 	public void successfullyCreateNewInstance() { // (1)
- 		var instance = new Movie(null, "The return of the dead", "Horror"); // (2)
- 		assertNull(instance.id()); // (3)
-
- 		assertThat(instance.genre()).contains("Horror"); //(4)
- 	}
-
- 	@Test
- 	public void invalidTitleCreateNewInstance() { // (5)
- 		assertThatExceptionOfType(IllegalArgumentException.class) // (6)
- 			.isThrownBy(() -> new Movie(null, null, "horror")) // (7)
- 			.withMessage("Invalid title. Checkout whether the title is informed and longer than 2 characters."); // (8)
- 	}
- }
-```
-`MovieTest` class has two methods, representing two tests. Whereas the first test checks whether valid values create a valid `Movie` instance (1), the second test checks whether the title validation works for a `null` title (5).
-
-For the first test, a `Movie` instance is created with valid values (2). Next, assertions check whether the instance `id` is not null (3) and the `genre` corresponds to the one informed when the instance was created (4). 
-
-Notice that the first assertion uses Junit `Assertions.assertNull` whereas the second assertion uses AssertJ `Assertions.assertThat`. AssertJ provides a more fluent API, in my opinion.
-
-The second test uses AssertJ `Assertions.assertThatExceptionOfType` to check whether an `IllegalArgumentException` is thrown (6) and a specific message is delivered (8) when the instance is provided with a `null` title (7).
-
-## Repository
-As Josh Long presented, there are two strategies for testing MongoDB repositories:  `ReactiveMongoTemplate` or the traditional repository-based testing. 
-
-Although I could not figure out the advantage of using `ReactiveMongoTemplate`, [the official documentation](https://spring.getdocs.org/en-US/spring-data-docs/spring-data-mongodb/reference/mongo.reactive/mongo.reactive.template.html) states that "A major difference between the two APIs is that `ReactiveMongoOperations` can be passed domain objects instead of `Document`, and there are fluent APIs for `Query`, `Criteria`, and `Update` operations instead of populating a `Document` to specify the parameters for those operations."
-
-The snippet of code below shows the `ReactiveMongoTemplate` strategy for testing whether the `save()` method works as expected. Note that this **is not** something one should be concerned with. However, this is just an exercise.
-
-```java
+```xml
 (...)
- import org.junit.jupiter.api.extension.ExtendWith;
- import org.springframework.beans.factory.annotation.Autowired;
- import org.springframework.boot.test.autoconfigure.data.mongo.DataMongoTest;
- import org.springframework.data.mongodb.core.ReactiveMongoTemplate;
- import org.springframework.test.context.junit.jupiter.SpringExtension;
 
- import reactor.test.StepVerifier;
+<dependency>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-starter-contract-verifier</artifactId>
+	<scope>test</scope>
+</dependency>
 
- @ExtendWith(SpringExtension.class) // (1)
- @DataMongoTest // (2)
- class MovieRepositoryTemplateTest {
+(...)
 
- 	@Autowired
- 	private ReactiveMongoTemplate template; // (3)
+<dependencyManagement>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-dependencies</artifactId>
+			<version>2021.0.0</version>
+			<type>pom</type>
+			<scope>import</scope>
+		</dependency>
+	</dependencies>
+</dependencyManagement>
 
- 	@Test
- 	public void testSave() {
- 		var movie = template.save(new Movie(null, "Back to school", "Horror")); // (4)
-
- 		StepVerifier
- 			.create(movie) // (5)
- 			.expectNextMatches(aMovie -> aMovie.title().startsWith("Back") && aMovie.id() != null) // (6)
- 			.verifyComplete(); //(7)
- 	}
-
- }
+(...)
 ```
 
-1. [Extends](https://junit.org/junit5/docs/current/user-guide/#extensions) JUnit to seamlessly integrate with Spring TestContext framework. Note that this annotation [may not be necessary here](https://rieckpil.de/what-the-heck-is-the-springextension-used-for/).
+[Second](https://github.com/gabrielcostasilva/reactivity-examples/commit/49253e966084dd123e6adc9442f10da5f901bf47), we create the contract in the `flux-flix-service/src/test/resources/contracts/shouldReturnAllMovies.groovy` file. In the example below, we used Groovy as Josh did in his presentation. However, I found it difficult to work with Groovy as I do not understand the language. One option is using [YAML instead](https://spring.io/blog/2018/02/13/spring-cloud-contract-in-a-polyglot-world). 
 
-2. Auto-configures MongoDB and loads repository-related features for the [Spring Test Context](https://rieckpil.de/spring-boot-test-slices-overview-and-usage/).
+```groovy
+package contracts
 
-3. Injects an instance of `ReactiveMongoTemplate` that is used for testing. It enables core [MongoDB operations](https://docs.spring.io/spring-data/mongodb/docs/current/api/org/springframework/data/mongodb/core/ReactiveMongoTemplate.html).
+ import org.springframework.cloud.contract.spec.Contract
+ import org.springframework.http.HttpStatus
+ import org.springframework.http.MediaType
 
-4. Uses the `ReactiveMongoTemplate` instance to save a given `Movie`. 
+ 
+  Contract.make { // (1)
+     description("should return all Movies")
+     request { // (2)
+         url ("/movies") // (3)
+         method GET() // (4)
+     }
+     response { // (5)
+         body( //(6)
+             [
+                 [id: 1, title: "Hello World", genre: "Horror"],
+                 [id: 2, title: "Look at me", genre: "Drama"]
+             ]
+         )
+         status(HttpStatus.OK.value()) // (7)
+         headers{ // (8)
+             contentType(MediaType.APPLICATION_JSON_VALUE)
+         }
+     }
+  } 
+```
+1. Defines the contract
+2. Sets the expected request
+3. Sets the request URL that will be called
+4. Sets the request method that will be used
+5. Sets the expected response
+6. Sets the response body content
+7. Sets the response status
+8. Sets the response headers
 
-5. [Creates a declarative way](https://projectreactor.io/docs/test/release/api/reactor/test/StepVerifier.html) to verify events in a `Publisher`. In this case, a `Mono<Movie>` resulting from the `ReactiveMongoTemplate.save()` method in line (4). 
+Notice that this code represents one single contract. One can create as many contracts as necessary.
 
-6. Specifies an expectation for the movie title (_assertion_).
+[Next](https://github.com/gabrielcostasilva/reactivity-examples/commit/f548d6a3624d33be9e9d8193b88a27dde6079176), we need to create a test class that will load what is necessary for testing the provider API. 
 
-7. Triggers the verification.
-
-The `MovieRepositoryTest` class implements the second test strategy. For the second test, I added a `findByTitle(String): Flux<Movie>` method into `MovieRepository`.
-
-The main difference between this second and the first test strategy is that this second strategy uses the `MovieRepository` instead of the `ReactiveMongoTemplate`. The code snippet below highlights main differences.
+For instance, the `MovieRestController` uses the `FluxFlixService`. In the `MovieRestControllerTest`, we used a mock for injecting the `FluxFlixService`. Therefore, we need to create a class that sets the mocks and everything else that is necessary. In this project, the class `BaseClass` is responsible for setting what we need for the contract test, as one can see below.
 
 ```java
 (...)
 
- import reactor.core.publisher.Flux;
+@SpringBootTest(
+    properties = "server.port=0",
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    classes = ReactiveDataApplication.class
+)
+@ExtendWith(SpringExtension.class)
+public class BaseClass {
 
-(...) 
+    @InjectMocks
+    private FluxFlixService service;
 
- class MovieRepositoryTest {
+    @MockBean
+    private MovieRepository repository;
 
- 	@Autowired
- 	private MovieRepository repository;
+    @LocalServerPort
+    private int port;
 
- 	@Test
- 	void queryTest() {
- 		var results = repository
- 				.deleteAll() // (1)
- 				.thenMany(Flux.just("AAA", "BBB", "CCC", "CCC")
- 						.map(title -> new Movie(null, title, "horror"))
- 						.flatMap(aMovie -> repository.save(aMovie))) // (2)
- 				.thenMany(repository.findByTitle("CCC")); // (3)
-
- 		StepVerifier
- 			.create(results)
- 			.expectNextCount(2) // (4)
- 			.verifyComplete();
- 	}
-
- }
+    @BeforeEach
+    public void before() {        
+        Mockito
+        .when(this.repository.findAll())
+        .thenReturn(
+            Flux.just(
+                    new Movie(null, "Hello World", "Horror"), 
+                    new Movie(null, "Look at me", "Drama")));
+                                
+        RestAssured.baseURI = "http://localhost:" + port;
+    }
+    
+}
 ```
 
-1. Deletes existent data.
+[Then](https://github.com/gabrielcostasilva/reactivity-examples/commit/e2e22b93058ce87f4fac1c7568aa2fe92b26de36), we need to add the cloud contract plugin and identify the base class in the configuration, as follows:
 
-2. Persists four `Movie` instances based on given titles.
+```xml
+<plugin>
+	<groupId>org.springframework.cloud</groupId>
+	<artifactId>spring-cloud-contract-maven-plugin</artifactId>
+	<version>3.1.0</version>
+	<extensions>true</extensions>
+	<configuration>
+		<baseClassForTests>com.example.reactivedata.BaseClass</baseClassForTests>
+	</configuration>
+</plugin>
+```
 
-3. Uses the `findByTitle(String): Flux<Movie>` method to retrieve `Movie`s that match the given title.
+Run `mvn install` to make the contract available locally. The contract will be transpilled into a new test class, as the code below shows. Notice that the `ContractVerifierTest` class extends the `BaseClass` we created previously. You can check the generated test class in your terminal with `find . -iname ContractVerifierTest.java`.
 
-4. Checks whether two `Movie` records were found.
-
-## Service
-Josh's presentation uses a different example that does not depend on a service layer. However, I noticed that `FluxFlixService` service class does nothing but wrapping _repository_ operations and creating a `Flux<MovieEvent>` based on simple calculations. 
-
-I have not noticed anything that is fundamentally different from the tests already done in here. **If you would like to try, go ahead and create a pull request with the test.**
-
-## Controller
-The code below presents the full `MovieRestController` test. 
 
 ```java
 package com.example.reactivedata;
 
- import org.junit.jupiter.api.Test;
- import org.junit.jupiter.api.extension.ExtendWith;
- import org.mockito.Mockito;
- import org.springframework.beans.factory.annotation.Autowired;
- import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
- import org.springframework.boot.test.mock.mockito.MockBean;
- import org.springframework.http.MediaType;
- import org.springframework.test.context.junit.jupiter.SpringExtension;
- import org.springframework.test.web.reactive.server.WebTestClient;
+import com.example.reactivedata.BaseClass;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import io.restassured.module.mockmvc.specification.MockMvcRequestSpecification;
+import io.restassured.response.ResponseOptions;
 
- import reactor.core.publisher.Flux;
+import static org.springframework.cloud.contract.verifier.assertion.SpringCloudContractAssertions.assertThat;
+import static org.springframework.cloud.contract.verifier.util.ContractVerifierUtil.*;
+import static com.toomuchcoding.jsonassert.JsonAssertion.assertThatJson;
+import static io.restassured.module.mockmvc.RestAssuredMockMvc.*;
 
- @ExtendWith(SpringExtension.class)
- @WebFluxTest // (1)
- class MovieRestControllerTest {
+@SuppressWarnings("rawtypes")
+public class ContractVerifierTest extends BaseClass {
 
- 	@MockBean // (2)
- 	private FluxFlixService service; // (2)
+	@Test
+	public void validate_shouldReturnAllMovies() throws Exception {
+		// given:
+			MockMvcRequestSpecification request = given();
 
- 	@Autowired
- 	private WebTestClient client; // (3)
 
- 	@Test
- 	public void test() {
- 		Mockito // (2)
- 			.when(this.service.findAll())
- 			.thenReturn(
- 				Flux.just(
- 						new Movie(null, "Hello World", "Comedy"), 
- 						new Movie(null, "Look at me", "Drama")));
+		// when:
+			ResponseOptions response = given().spec(request)
+					.get("/movie");
 
- 		this.client
- 				.get()
- 				.uri("/movies") // (4)
- 				.exchange()
- 				.expectStatus().isOk() // (5)
- 				.expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON) // (6)
- 				.expectBody() // (7)
- 					.jsonPath("@.[0].title").isEqualTo("Hello World")
- 					.jsonPath("@.[1].title").isEqualTo("Look at me");
- 	}
+		// then:
+			assertThat(response.statusCode()).isEqualTo(200);
+			assertThat(response.header("Content-Type")).matches("application/json.*");
 
- }
+		// and:
+			DocumentContext parsedJson = JsonPath.parse(response.getBody().asString());
+			assertThatJson(parsedJson).array().contains("['id']").isEqualTo(1);
+			assertThatJson(parsedJson).array().contains("['title']").isEqualTo("Helo World");
+			assertThatJson(parsedJson).array().contains("['genre']").isEqualTo("Horror");
+			assertThatJson(parsedJson).array().contains("['id']").isEqualTo(2);
+			assertThatJson(parsedJson).array().contains("['title']").isEqualTo("Look at me");
+			assertThatJson(parsedJson).array().contains("['genre']").isEqualTo("Comedy");
+	}
+
+}
 ```
+If the build process is successfully concluded, it means the provider complies with the contract and that the contract is now available for testing the consumer.
 
-1. As in the `repository` test, we load only what is necessary for this test rather than loading the entire application context. In this case, we do not load anything related to the database. Only configuration [relevant to WebFlux test is loaded](https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/reactive/WebFluxTest.html).
+As before, to test the consumer/client we need the `spring-cloud-contract-stub-runner` dependency. Notice that we no longer need the `spring-cloud-contract-wiremock` dependency as the wiremock test was removed in this version.
 
-2. `MovieRestController` uses `FluxFlixService` as an API to access services. Therefore, we _mock_ this service. Notice that the first line in the `test()` method sets the expected return for the method that the controller is going to use.
-
-3. Injects a `WebTestClient`. The annotation uses the `WebClient` [to access the API](https://howtodoinjava.com/spring-webflux/webfluxtest-with-webtestclient/). The `WebClient` is a non blocking [alternative to RestTemplate](https://www.baeldung.com/spring-webclient-resttemplate). Notice that the `WebTestClient` is auto-configured [thanks to `@WebFluxText`](https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/web/reactive/WebFluxTest.html).
-
-4. Sets the URL that will be called.
-
-5. Sets the expected response status.
-
-6. Sets the expected response content type.
-
-7. Sets the expected body content. Notice that it uses JSON path to query the JSON response searching for expected movie titles.
-
-
-## Client
-To test the client, first we had to fix the lack of MongoDB dependency by adding `spring-boot-starter-data-mongodb` to the `pom.xml`. Without this dependency, the `Movie` entity annotation `@Document` could not resolve.
-
-Next, the `spring-cloud-contract-wiremock` dependency to enable mocking a REST API. Please checkout the [commit](https://github.com/gabrielcostasilva/reactivity-examples/commit/fe5bf6d5c0f32cb67ed9246bffb9e7d8a53bab5a) for details.
-
-Finally, we had to [move the client code to its own class](https://github.com/gabrielcostasilva/reactivity-examples/commit/f1722e09cb3070fd788e450b327ac1d214eb3112) instead of keeping the code in the `main` method. 
-
-The code below shows the full client test.
+For testing the client, we removed all references from the wiremock and added: 
 
 ```java
-package com.example.reactivedata;
+(...)
 
- import java.util.List;
- import java.util.function.Predicate;
+@AutoConfigureStubRunner(
+	stubsMode = StubRunnerProperties.StubsMode.LOCAL,
+	ids = "com.example:flux-flix-service:+:8080"
+)
 
- import org.junit.jupiter.api.Test;
- import org.junit.jupiter.api.extension.ExtendWith;
- import org.springframework.beans.factory.annotation.Autowired;
- import org.springframework.boot.test.autoconfigure.json.AutoConfigureJson;
- import org.springframework.boot.test.context.SpringBootTest;
- import org.springframework.cloud.contract.wiremock.AutoConfigureWireMock;
- import org.springframework.http.HttpHeaders;
- import org.springframework.http.HttpStatus;
- import org.springframework.http.MediaType;
- import org.springframework.test.context.junit.jupiter.SpringExtension;
-
- import com.fasterxml.jackson.databind.ObjectMapper;
- import com.github.tomakehurst.wiremock.client.WireMock;
-
- import reactor.test.StepVerifier;
-
- @ExtendWith(SpringExtension.class)
- @AutoConfigureWireMock(port = 8080) // (1)
- @AutoConfigureJson // (3)
- @SpringBootTest
- class MovieWebClientTest {
-
- 	@Autowired
- 	private MovieWebClient client;
-
- 	@Autowired
- 	private ObjectMapper objectMapper; // (4)
-
- 	@Test
- 	public void test() throws Exception {
-
- 		var movies = List.of(
- 				new Movie(null, "Hello World", "Horror"), 
- 				new Movie(null, "Here I am", "Comedy"));
-
- 		var json = objectMapper.writeValueAsString(movies); // (5)
-
- 		WireMock.stubFor( /// (2)
- 				WireMock.get(WireMock.urlEqualTo("/movies"))
- 			.willReturn(
- 					WireMock.aResponse()
- 						.withBody(json) // (6)
- 						.withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
- 						.withStatus(HttpStatus.OK.value())));
-
- 		StepVerifier // (8)
- 			.create(this.client.getAllMovies())
- 			.expectNextMatches(predicate(null, "Hello World", "Horror"))
- 			.expectNextMatches(predicate(null, "Here I am", "Comedy"))
- 			.verifyComplete();
- 	}
-
- 	Predicate<Movie> predicate(String id, String title, String genre) { // (7)
- 		return movie -> movie.title().equalsIgnoreCase(title);
- 	}
-
- }
+(...)
 ```
-1. Auto-configures [WireMock](https://github.com/wiremock/wiremock) to mocking REST calls. WireMock is part of [Spring Cloud Contract](https://cloud.spring.io/spring-cloud-contract/2.0.x/multi/multi__spring_cloud_contract_wiremock.html), which is necessary in the [dependencies](https://github.com/gabrielcostasilva/reactivity-examples/commit/fe5bf6d5c0f32cb67ed9246bffb9e7d8a53bab5a).
 
-2. Uses WireMock for creating a mock URL that will return a expected body, header and status.
-
-3. Auto-configures the imports for JSON tests. Interestingly, the [official documentation](https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/test/autoconfigure/json/AutoConfigureJson.html) urges to use `@JsonTest` instead. As the `AutoConfigureWireMock` annotation, this annotation is part of the [slice-based test](https://stackoverflow.com/questions/66437493/spring-boot-how-auto-configure-works-and-jsontest) that Spring enables.
-
-4. Injects and [ObjectMapper to enable](https://www.baeldung.com/jackson-object-mapper-tutorial) serializing and deserializing JSON objects.
-
-5. Creates a JSON object based on a list of `Movie`s.
-
-6. Sets the JSON object as a body for the mock REST API response.
-
-7. Creates a convenience method to evaluate expected values.
-
-8. Checks for expected values.
+The annotation instructs to use the local Maven repository for finding the `groupId` and `artifactId` set as `ids`. If the test pass, it means the client complies with the API.
