@@ -18,3 +18,5 @@ Each folder groups a single example as follows:
 In addition to the examples listed in the main branch, I also created additional branches that extends the code in some way.
 
 - [testing](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing) shows how to test the entire stack of a reactive Web application with Spring Boot. The main reference for this branch is [Josh Long's presentation](https://www.youtube.com/watch?v=N24JZi-xFx0).
+
+- [testing-contract](https://github.com/gabrielcostasilva/reactivity-examples/tree/testing-contract) shows how to use consumer-driven contract testing to ensure that client/service (consumer/provider) agrees with a common interface.
