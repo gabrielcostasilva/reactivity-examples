@@ -14,6 +14,10 @@ Each folder groups a single example as follows:
 
 - [flux-flix-client](./flux-flix-client/) uses WebClient REST client to call the [flux-flix-service](./flux-flix-service/).
 
+- [websockets-reactive](./websockets-reactive/) shows how to create a WebSocket handler to send continuous message to a client.
+
+- [websockets-reactive-client](./websockets-reactive-client/) creates a reactive Spring Boot WebSocket client.
+
 ## Overview of Branches
 In addition to the examples listed in the main branch, I also created additional branches that extends the code in some way.
 
