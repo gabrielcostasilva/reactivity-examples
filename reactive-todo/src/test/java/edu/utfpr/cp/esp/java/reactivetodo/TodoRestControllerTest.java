@@ -91,7 +91,7 @@ public class TodoRestControllerTest {
             .uri("/todo")
             .body(BodyInserters.fromValue(todo))
             .exchange()
-            .expectStatus().isOk();
+            .expectStatus().is2xxSuccessful();
     }
 
     @Test
